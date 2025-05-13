@@ -4,6 +4,10 @@ import seaborn as sns
 import tkinter as tk
 from tkinter import ttk
 
+# Map user selection to actual functions/values
+agg_func_map = {"Mean": pd.Series.mean, "Median": pd.Series.median}
+error_type_map = {"SEM": "se", "SD": "sd"}
+
 # Function to create the plot
 def create_plot(agg_func, error_type, y_scale, log_base):
     # Clear the current figure
@@ -56,7 +60,6 @@ def create_plot(agg_func, error_type, y_scale, log_base):
     plt.draw()
     plt.pause(0.001)  # Allow the plot to update dynamically
 
-# Function to generate a plot based on the table data
 def generate_plot_from_table(tree, columns, agg_func, error_type, y_scale, log_base):
     # Extract data from the Treeview
     table_data = []
@@ -108,9 +111,11 @@ def generate_plot_from_table(tree, columns, agg_func, error_type, y_scale, log_b
         dodge=True
     )
 
+    # Set y-axis scale
     if y_scale == "Logarithmic":
         plt.yscale("log", base=float(log_base))
 
+    # Customize
     plt.title(f"Bar Plot with Individual Data Points ({agg_func.__name__.capitalize()} ± {error_type.upper()})")
     plt.ylabel("Value")
     plt.xlabel("Group")
@@ -145,7 +150,12 @@ def show_table_popup(agg_func, error_type, y_scale, log_base):
             show_table_popup.popup,
             text="Generate Plot from Table",
             command=lambda: generate_plot_from_table(
-                show_table_popup.tree, df.columns, agg_func, error_type, y_scale, log_base
+                show_table_popup.tree,
+                df.columns,
+                agg_func_map[mean_var.get()],  # Fetch current aggregation function
+                error_type_map[error_var.get()],  # Fetch current error type
+                y_scale_var.get(),  # Fetch current y-axis scale
+                log_base_var.get()  # Fetch current log base
             )
         ).pack(pady=10)
 
@@ -159,10 +169,6 @@ def on_plot_button_click():
     error_type = error_var.get()
     y_scale = y_scale_var.get()
     log_base = log_base_var.get()
-
-    # Map user selection to actual functions/values
-    agg_func_map = {"Mean": pd.Series.mean, "Median": pd.Series.median}
-    error_type_map = {"SEM": "se", "SD": "sd"}
 
     # Generate the default plot from clipboard data
     create_plot(agg_func_map[agg_func], error_type_map[error_type], y_scale, log_base)
