@@ -61,13 +61,16 @@ def create_plot(agg_func, error_type, y_scale, log_base):
     plt.pause(0.001)  # Allow the plot to update dynamically
 
 def generate_plot_from_table(tree, columns, agg_func, error_type, y_scale, log_base):
+    # Extract column headers (group titles) dynamically from the Treeview
+    edited_columns = [tree.heading(f"#{i+1}", "text") for i in range(len(columns))]
+
     # Extract data from the Treeview
     table_data = []
     for item in tree.get_children():
         table_data.append(tree.item(item, "values"))
 
     # Convert the data back to a DataFrame
-    table_df = pd.DataFrame(table_data, columns=columns)
+    table_df = pd.DataFrame(table_data, columns=edited_columns)
 
     # Ensure numeric columns are properly converted
     for col in table_df.columns:
@@ -124,36 +127,58 @@ def generate_plot_from_table(tree, columns, agg_func, error_type, y_scale, log_b
     plt.pause(0.001)
 
 def make_table_editable(tree):
-    """Make the Treeview table editable."""
+    """Make the Treeview table and column headers editable."""
     def on_double_click(event):
-        # Identify the row and column clicked
+        # Identify the region clicked (cell or heading)
         region = tree.identify("region", event.x, event.y)
-        if region != "cell":
-            return
 
-        row_id = tree.identify_row(event.y)
-        column_id = tree.identify_column(event.x)
+        if region == "cell":
+            # Edit cell values
+            row_id = tree.identify_row(event.y)
+            column_id = tree.identify_column(event.x)
 
-        # Get the current value of the cell
-        current_value = tree.item(row_id, "values")[int(column_id[1:]) - 1]
+            # Get the current value of the cell
+            current_value = tree.item(row_id, "values")[int(column_id[1:]) - 1]
 
-        # Create an Entry widget for editing
-        entry = tk.Entry(tree)
-        entry.insert(0, current_value)
-        entry.place(x=event.x, y=event.y, width=tree.column(column_id, "width"))
+            # Create an Entry widget for editing
+            entry = tk.Entry(tree)
+            entry.insert(0, current_value)
+            entry.place(x=event.x, y=event.y, width=tree.column(column_id, "width"))
 
-        # Function to save the new value
-        def save_edit(event=None):
-            new_value = entry.get()
-            values = list(tree.item(row_id, "values"))
-            values[int(column_id[1:]) - 1] = new_value
-            tree.item(row_id, values=values)
-            entry.destroy()
+            # Function to save the new value
+            def save_edit(event=None):
+                new_value = entry.get()
+                values = list(tree.item(row_id, "values"))
+                values[int(column_id[1:]) - 1] = new_value
+                tree.item(row_id, values=values)
+                entry.destroy()
 
-        # Bind Enter key and focus-out event to save the edit
-        entry.bind("<Return>", save_edit)
-        entry.bind("<FocusOut>", lambda e: entry.destroy())
-        entry.focus()
+            # Bind Enter key and focus-out event to save the edit
+            entry.bind("<Return>", save_edit)
+            entry.bind("<FocusOut>", lambda e: entry.destroy())
+            entry.focus()
+
+        elif region == "heading":
+            # Edit column headers
+            column_id = tree.identify_column(event.x)
+            column_index = int(column_id[1:]) - 1
+            current_header = tree.heading(column_id, "text")
+
+            # Create an Entry widget for editing the header
+            entry = tk.Entry(tree)
+            entry.insert(0, current_header)
+            entry.place(x=event.x, y=0, width=tree.column(column_id, "width"))
+
+            # Function to save the new header
+            def save_header(event=None):
+                new_header = entry.get()
+                tree.heading(column_id, text=new_header)
+                entry.destroy()
+
+            # Bind Enter key and focus-out event to save the header
+            entry.bind("<Return>", save_header)
+            entry.bind("<FocusOut>", lambda e: entry.destroy())
+            entry.focus()
 
     # Bind the double-click event to the Treeview
     tree.bind("<Double-1>", on_double_click)
@@ -168,6 +193,17 @@ def show_table_popup(agg_func, error_type, y_scale, log_base):
         # Clear the existing Treeview widget
         for item in show_table_popup.tree.get_children():
             show_table_popup.tree.delete(item)
+
+        # Clear existing column configurations
+        for col in show_table_popup.tree["columns"]:
+            show_table_popup.tree.heading(col, text="")  # Clear column headers
+            show_table_popup.tree.column(col, width=0)  # Reset column width
+
+        # Reset column headers to match the new data
+        show_table_popup.tree["columns"] = list(df.columns)
+        for i, col in enumerate(df.columns):
+            show_table_popup.tree.heading(f"#{i+1}", text=col)
+            show_table_popup.tree.column(f"#{i+1}", width=100, anchor="center")
     else:
         # Create a new popup window
         show_table_popup.popup = tk.Toplevel()
