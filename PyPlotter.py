@@ -56,91 +56,102 @@ def create_plot(agg_func, error_type, y_scale, log_base):
     plt.draw()
     plt.pause(0.001)  # Allow the plot to update dynamically
 
+# Function to generate a plot based on the table data
+def generate_plot_from_table(tree, columns, agg_func, error_type, y_scale, log_base):
+    # Extract data from the Treeview
+    table_data = []
+    for item in tree.get_children():
+        table_data.append(tree.item(item, "values"))
+
+    # Convert the data back to a DataFrame
+    table_df = pd.DataFrame(table_data, columns=columns)
+
+    # Ensure numeric columns are properly converted
+    for col in table_df.columns:
+        table_df[col] = pd.to_numeric(table_df[col], errors='coerce')  # Coerce invalid values to NaN
+
+    # Drop rows with NaN values to clean the data
+    table_df = table_df.dropna()
+
+    # Melt the DataFrame to long format for seaborn
+    table_df_long = table_df.melt(var_name='Group', value_name='Value')
+
+    # Ensure the 'Value' column is numeric
+    table_df_long['Value'] = pd.to_numeric(table_df_long['Value'], errors='coerce')
+
+    # Drop rows with NaN values again after melting
+    table_df_long = table_df_long.dropna()
+
+    # Generate the plot
+    plt.clf()
+    fig = plt.gcf()
+    fig.set_size_inches(8, 6)
+
+    sns.barplot(
+        data=table_df_long,
+        x='Group',
+        y='Value',
+        estimator=agg_func,
+        errorbar=error_type,
+        capsize=0.2,
+        color='lightblue',
+        edgecolor='black'
+    )
+
+    sns.stripplot(
+        data=table_df_long,
+        x='Group',
+        y='Value',
+        color='black',
+        alpha=0.7,
+        jitter=True,
+        dodge=True
+    )
+
+    if y_scale == "Logarithmic":
+        plt.yscale("log", base=float(log_base))
+
+    plt.title(f"Bar Plot with Individual Data Points ({agg_func.__name__.capitalize()} ± {error_type.upper()})")
+    plt.ylabel("Value")
+    plt.xlabel("Group")
+    plt.tight_layout()
+    plt.draw()
+    plt.pause(0.001)
+
 # Function to display the clipboard data in a popup window
 def show_table_popup(agg_func, error_type, y_scale, log_base):
     # Read wide-format data from clipboard
     df = pd.read_clipboard()
 
-    # Create a new popup window
-    popup = tk.Toplevel()
-    popup.title("Clipboard Data Table")
+    # Check if the popup window already exists
+    if hasattr(show_table_popup, "popup") and show_table_popup.popup.winfo_exists():
+        # Clear the existing Treeview widget
+        for item in show_table_popup.tree.get_children():
+            show_table_popup.tree.delete(item)
+    else:
+        # Create a new popup window
+        show_table_popup.popup = tk.Toplevel()
+        show_table_popup.popup.title("Clipboard Data Table")
 
-    # Create a Treeview widget to display the data
-    tree = ttk.Treeview(popup, columns=list(df.columns), show="headings")
-    for col in df.columns:
-        tree.heading(col, text=col)
-        tree.column(col, width=100, anchor="center")
+        # Create a Treeview widget to display the data
+        show_table_popup.tree = ttk.Treeview(show_table_popup.popup, columns=list(df.columns), show="headings")
+        for col in df.columns:
+            show_table_popup.tree.heading(col, text=col)
+            show_table_popup.tree.column(col, width=100, anchor="center")
+        show_table_popup.tree.pack(fill="both", expand=True)
 
-    # Insert data into the Treeview
+        # Add a button to generate a plot from the table data
+        ttk.Button(
+            show_table_popup.popup,
+            text="Generate Plot from Table",
+            command=lambda: generate_plot_from_table(
+                show_table_popup.tree, df.columns, agg_func, error_type, y_scale, log_base
+            )
+        ).pack(pady=10)
+
+    # Insert new data into the Treeview
     for _, row in df.iterrows():
-        tree.insert("", "end", values=list(row))
-
-    tree.pack(fill="both", expand=True)
-
-    # Function to generate a plot based on the table data
-    def generate_plot_from_table():
-        # Extract data from the Treeview
-        table_data = []
-        for item in tree.get_children():
-            table_data.append(tree.item(item, "values"))
-
-        # Convert the data back to a DataFrame
-        table_df = pd.DataFrame(table_data, columns=df.columns)
-
-        # Ensure numeric columns are properly converted
-        for col in table_df.columns:
-            table_df[col] = pd.to_numeric(table_df[col], errors='coerce')  # Coerce invalid values to NaN
-
-        # Drop rows with NaN values to clean the data
-        table_df = table_df.dropna()
-
-        # Melt the DataFrame to long format for seaborn
-        table_df_long = table_df.melt(var_name='Group', value_name='Value')
-
-        # Ensure the 'Value' column is numeric
-        table_df_long['Value'] = pd.to_numeric(table_df_long['Value'], errors='coerce')
-
-        # Drop rows with NaN values again after melting
-        table_df_long = table_df_long.dropna()
-
-        # Generate the plot
-        plt.clf()
-        fig = plt.gcf()
-        fig.set_size_inches(8, 6)
-
-        sns.barplot(
-            data=table_df_long,
-            x='Group',
-            y='Value',
-            estimator=agg_func,
-            errorbar=error_type,
-            capsize=0.2,
-            color='lightblue',
-            edgecolor='black'
-        )
-
-        sns.stripplot(
-            data=table_df_long,
-            x='Group',
-            y='Value',
-            color='black',
-            alpha=0.7,
-            jitter=True,
-            dodge=True
-        )
-
-        if y_scale == "Logarithmic":
-            plt.yscale("log", base=float(log_base))
-
-        plt.title(f"Bar Plot with Individual Data Points ({agg_func.__name__.capitalize()} ± {error_type.upper()})")
-        plt.ylabel("Value")
-        plt.xlabel("Group")
-        plt.tight_layout()
-        plt.draw()
-        plt.pause(0.001)
-
-    # Add a button to generate a plot from the table data
-    ttk.Button(popup, text="Generate Plot from Table", command=generate_plot_from_table).pack(pady=10)
+        show_table_popup.tree.insert("", "end", values=list(row))
 
 # Function to handle GUI button click
 def on_plot_button_click():
