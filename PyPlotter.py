@@ -123,6 +123,41 @@ def generate_plot_from_table(tree, columns, agg_func, error_type, y_scale, log_b
     plt.draw()
     plt.pause(0.001)
 
+def make_table_editable(tree):
+    """Make the Treeview table editable."""
+    def on_double_click(event):
+        # Identify the row and column clicked
+        region = tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+
+        row_id = tree.identify_row(event.y)
+        column_id = tree.identify_column(event.x)
+
+        # Get the current value of the cell
+        current_value = tree.item(row_id, "values")[int(column_id[1:]) - 1]
+
+        # Create an Entry widget for editing
+        entry = tk.Entry(tree)
+        entry.insert(0, current_value)
+        entry.place(x=event.x, y=event.y, width=tree.column(column_id, "width"))
+
+        # Function to save the new value
+        def save_edit(event=None):
+            new_value = entry.get()
+            values = list(tree.item(row_id, "values"))
+            values[int(column_id[1:]) - 1] = new_value
+            tree.item(row_id, values=values)
+            entry.destroy()
+
+        # Bind Enter key and focus-out event to save the edit
+        entry.bind("<Return>", save_edit)
+        entry.bind("<FocusOut>", lambda e: entry.destroy())
+        entry.focus()
+
+    # Bind the double-click event to the Treeview
+    tree.bind("<Double-1>", on_double_click)
+
 # Function to display the clipboard data in a popup window
 def show_table_popup(agg_func, error_type, y_scale, log_base):
     # Read wide-format data from clipboard
@@ -144,6 +179,9 @@ def show_table_popup(agg_func, error_type, y_scale, log_base):
             show_table_popup.tree.heading(col, text=col)
             show_table_popup.tree.column(col, width=100, anchor="center")
         show_table_popup.tree.pack(fill="both", expand=True)
+
+        # Make the table editable
+        make_table_editable(show_table_popup.tree)
 
         # Add a button to generate a plot from the table data
         ttk.Button(
