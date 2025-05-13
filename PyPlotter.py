@@ -6,6 +6,9 @@ from tkinter import ttk
 
 # Function to create the plot
 def create_plot(agg_func, error_type, y_scale, log_base):
+    # Clear the current figure
+    plt.clf()
+
     # Read wide-format data from clipboard (copied from Excel)
     df = pd.read_clipboard()
 
@@ -13,7 +16,8 @@ def create_plot(agg_func, error_type, y_scale, log_base):
     df_long = df.melt(var_name='Group', value_name='Value')
 
     # Create the plot
-    plt.figure(figsize=(8, 6))
+    fig = plt.gcf()
+    fig.set_size_inches(8, 6)
 
     # Bar plot with selected aggregation function and error type
     sns.barplot(
@@ -48,8 +52,9 @@ def create_plot(agg_func, error_type, y_scale, log_base):
     plt.xlabel("Group")
     plt.tight_layout()
 
-    # Show the plot
-    plt.show()
+    # Draw the updated plot
+    plt.draw()
+    plt.pause(0.001)  # Allow the plot to update dynamically
 
 # Function to handle GUI button click
 def on_plot_button_click():
